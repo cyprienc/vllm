@@ -169,6 +169,8 @@ class SamplingParams(
             always return the log probability of the sampled token, so there
             may be up to `logprobs+1` elements in the response.
         prompt_logprobs: Number of log probabilities to return per prompt token.
+        watchlist_prompt_logprobs_token_ids: List of additional token ids to
+            return prompt logprobs for.
         detokenize: Whether to detokenize the output. Defaults to True.
         skip_special_tokens: Whether to skip special tokens in the output.
         spaces_between_special_tokens: Whether to add spaces between special
@@ -209,6 +211,7 @@ class SamplingParams(
     min_tokens: int = 0
     logprobs: Optional[int] = None
     prompt_logprobs: Optional[int] = None
+    watchlist_prompt_logprobs_token_ids: Optional[list[int]] = None
     # NOTE: This parameter is only exposed at the engine level for now.
     # It is not exposed in the OpenAI API server, as the OpenAI API does
     # not support returning only a list of token IDs.
@@ -258,6 +261,7 @@ class SamplingParams(
         min_tokens: int = 0,
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
+        watchlist_prompt_logprobs_token_ids: Optional[list[int]] = None,
         detokenize: bool = True,
         skip_special_tokens: bool = True,
         spaces_between_special_tokens: bool = True,
@@ -301,6 +305,8 @@ class SamplingParams(
             min_tokens=min_tokens,
             logprobs=logprobs,
             prompt_logprobs=prompt_logprobs,
+            watchlist_prompt_logprobs_token_ids=
+            watchlist_prompt_logprobs_token_ids,
             detokenize=detokenize,
             skip_special_tokens=skip_special_tokens,
             spaces_between_special_tokens=spaces_between_special_tokens,
@@ -419,6 +425,11 @@ class SamplingParams(
         if self.prompt_logprobs is not None and self.prompt_logprobs < 0:
             raise ValueError(f"prompt_logprobs must be non-negative, got "
                              f"{self.prompt_logprobs}.")
+        if (self.prompt_logprobs is None
+                and self.watchlist_prompt_logprobs_token_ids):
+            raise ValueError(
+                "prompt_logprobs must be set to a non-None value to use "
+                "watchlist_prompt_logprobs_token_ids.")
         if (self.truncate_prompt_tokens is not None
                 and self.truncate_prompt_tokens < 1):
             raise ValueError(f"truncate_prompt_tokens must be >= 1, "
@@ -558,6 +569,8 @@ class SamplingParams(
             f"min_tokens={self.min_tokens}, "
             f"logprobs={self.logprobs}, "
             f"prompt_logprobs={self.prompt_logprobs}, "
+            "watchlist_prompt_logprobs_token_ids="
+            f"{self.watchlist_prompt_logprobs_token_ids}, "
             f"skip_special_tokens={self.skip_special_tokens}, "
             "spaces_between_special_tokens="
             f"{self.spaces_between_special_tokens}, "

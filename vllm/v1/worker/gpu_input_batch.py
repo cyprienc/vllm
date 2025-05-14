@@ -204,6 +204,8 @@ class InputBatch:
         # that are currently in the prefill phase.
         self.num_prompt_logprobs: dict[str, int] = {}
 
+        self.watchlist_prompt_logprobs_token_ids: dict[str, list[int]] = {}
+
         # To accumulate prompt logprobs tensor chunks across prefill steps.
         self.in_progress_prompt_logprobs_cpu: dict[str, LogprobsTensors] = {}
 
@@ -312,6 +314,9 @@ class InputBatch:
             self.num_logprobs[req_id] = sampling_params.logprobs
         if sampling_params.prompt_logprobs is not None:
             self.num_prompt_logprobs[req_id] = sampling_params.prompt_logprobs
+        if sampling_params.watchlist_prompt_logprobs_token_ids is not None:
+            self.watchlist_prompt_logprobs_token_ids[
+                req_id] = sampling_params.watchlist_prompt_logprobs_token_ids
         if sampling_params.logit_bias is not None:
             self.logit_bias[req_index] = sampling_params.logit_bias
 

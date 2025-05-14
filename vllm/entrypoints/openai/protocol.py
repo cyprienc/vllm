@@ -261,6 +261,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
     spaces_between_special_tokens: bool = True
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     prompt_logprobs: Optional[int] = None
+    watchlist_prompt_logprobs_token_ids: Optional[list[int]] = None
     # doc: end-chat-completion-sampling-params
 
     # doc: begin-chat-completion-extra-params
@@ -502,6 +503,7 @@ class ChatCompletionRequest(OpenAIBaseModel):
             stop_token_ids=self.stop_token_ids,
             logprobs=self.top_logprobs if self.logprobs else None,
             prompt_logprobs=prompt_logprobs,
+            watchlist_prompt_logprobs_token_ids=self.watchlist_prompt_logprobs_token_ids,
             ignore_eos=self.ignore_eos,
             max_tokens=max_tokens,
             min_tokens=self.min_tokens,
@@ -733,6 +735,7 @@ class CompletionRequest(OpenAIBaseModel):
     truncate_prompt_tokens: Optional[Annotated[int, Field(ge=1)]] = None
     allowed_token_ids: Optional[list[int]] = None
     prompt_logprobs: Optional[int] = None
+    watchlist_prompt_logprobs_token_ids: Optional[list[int]] = None
     # doc: end-completion-sampling-params
 
     # doc: begin-completion-extra-params
@@ -922,6 +925,7 @@ class CompletionRequest(OpenAIBaseModel):
             max_tokens=max_tokens if not echo_without_generation else 1,
             min_tokens=self.min_tokens,
             prompt_logprobs=prompt_logprobs,
+            watchlist_prompt_logprobs_token_ids=self.watchlist_prompt_logprobs_token_ids,
             skip_special_tokens=self.skip_special_tokens,
             spaces_between_special_tokens=self.spaces_between_special_tokens,
             include_stop_str_in_output=self.include_stop_str_in_output,

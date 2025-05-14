@@ -1298,7 +1298,9 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         scheduler_output: "SchedulerOutput",
     ) -> dict[str, Optional[LogprobsTensors]]:
         num_prompt_logprobs_dict = self.input_batch.num_prompt_logprobs
-        if not num_prompt_logprobs_dict:
+        watchlist_dict = self.input_batch.watchlist_prompt_logprobs_token_ids
+
+        if not num_prompt_logprobs_dict and not watchlist_dict:
             return {}
 
         in_progress_dict = self.input_batch.in_progress_prompt_logprobs_cpu
@@ -1310,12 +1312,19 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         for req_id, num_prompt_logprobs in num_prompt_logprobs_dict.items():
 
             num_tokens = scheduler_output.num_scheduled_tokens[req_id]
+            watchlist_ids = watchlist_dict.get(req_id, [])
 
             # Get metadata for this request.
             request = self.requests[req_id]
             num_prompt_tokens = len(request.prompt_token_ids)
             prompt_token_ids = torch.tensor(request.prompt_token_ids).to(
                 self.device, non_blocking=True)
+            num_watchlist_tokens = len(watchlist_ids)
+            if watchlist_ids:
+                watchlist_token_ids = torch.tensor(watchlist_ids).to(
+                    self.device, non_blocking=True)
+            else:
+                watchlist_token_ids = None
 
             # Set up target LogprobsTensors object.
             logprobs_tensors = in_progress_dict.get(req_id)
@@ -1323,7 +1332,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
                 # Create empty logprobs CPU tensors for the entire prompt.
                 # If chunked, we'll copy in slice by slice.
                 logprobs_tensors = LogprobsTensors.empty_cpu(
-                    num_prompt_tokens - 1, num_prompt_logprobs + 1)
+                    num_prompt_tokens - 1,
+                    num_prompt_logprobs + num_watchlist_tokens + 1)
                 in_progress_dict[req_id] = logprobs_tensors
 
             # Determine number of logits to retrieve.
@@ -1362,9 +1372,19 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             tgt_token_ids = prompt_token_ids[start_tok:start_tok + num_logits]
 
             # Compute prompt logprobs.
-            logprobs = self.model.sampler.compute_logprobs(logits)
+            full_logprobs = self.model.sampler.compute_logprobs(logits)
             token_ids, logprobs, ranks = self.model.sampler.gather_logprobs(
-                logprobs, num_prompt_logprobs, tgt_token_ids)
+                full_logprobs, num_prompt_logprobs, tgt_token_ids)
+
+            # Fetch watchlist logprobs if needed.
+            if watchlist_token_ids is not None:
+                watchlist_logps = torch.index_select(full_logprobs,
+                                                     dim=1,
+                                                     index=watchlist_token_ids)
+                watchlist_token_ids = (watchlist_token_ids.unsqueeze(0).expand(
+                    num_logits, -1))
+                token_ids = torch.cat((token_ids, watchlist_token_ids), dim=1)
+                logprobs = torch.cat((logprobs, watchlist_logps), dim=1)
 
             # Transfer GPU->CPU async.
             chunk_slice = slice(start_idx, start_idx + num_logits)

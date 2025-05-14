@@ -16,6 +16,8 @@ from ...conftest import HfRunner, VllmRunner
 
 MODEL = "meta-llama/Llama-3.2-1B-Instruct"
 DTYPE = "half"
+BEGIN_OF_TEXT_TOKEN_ID = 128000
+END_OF_TEXT_TOKEN_ID = 128001
 
 NONE = BatchLogprobsComposition.NONE
 SAMPLE = BatchLogprobsComposition.SAMPLE
@@ -422,3 +424,49 @@ def test_zero_logprobs(vllm_model, example_prompts,
             # prompt token
             assert prompt_logprobs is not None
             assert len(prompt_token_ids) == len(prompt_logprobs)
+
+
+def test_watchlist_logprobs(vllm_model, example_prompts,
+                            monkeypatch: pytest.MonkeyPatch):
+    """Engine should return sampled token and prompt token logprobs
+    and watchlist prompt logprobs
+
+    Args:
+      vllm_model: vLLM model fixture
+      example_prompts: list of example prompts (test fixture)
+    """
+    with monkeypatch.context() as m:
+        m.setenv("VLLM_USE_V1", "1")
+        max_tokens = 5
+        watchlist = [BEGIN_OF_TEXT_TOKEN_ID, END_OF_TEXT_TOKEN_ID]
+
+        sampling_params_logprobs_watchlist = SamplingParams(
+            max_tokens=max_tokens,
+            logprobs=0,
+            prompt_logprobs=0,
+            watchlist_prompt_logprobs_token_ids=watchlist,
+            temperature=0.0)
+        results_logprobs_watchlist = vllm_model.model.generate(
+            example_prompts,
+            sampling_params=sampling_params_logprobs_watchlist)
+        assert len(results_logprobs_watchlist) == len(example_prompts)
+
+        for i in range(len(results_logprobs_watchlist)):
+            # Check that there is one sample logprob dict for each
+            # sample token
+            logprobs = results_logprobs_watchlist[i].outputs[0].logprobs
+            prompt_logprobs = results_logprobs_watchlist[i].prompt_logprobs
+            sampled_token_ids = results_logprobs_watchlist[i].outputs[
+                0].token_ids
+            prompt_token_ids = results_logprobs_watchlist[i].prompt_token_ids
+            assert logprobs is not None
+            assert len(sampled_token_ids) == len(logprobs)
+            assert results_logprobs_watchlist[i].outputs[
+                0].cumulative_logprob is not None
+            # Check that there is one prompt logprob dict for each
+            # prompt token
+            assert prompt_logprobs is not None
+            assert len(prompt_token_ids) == len(prompt_logprobs)
+            assert all(
+                len(logprob) == len(watchlist) + 1
+                for logprob in prompt_logprobs[1:])

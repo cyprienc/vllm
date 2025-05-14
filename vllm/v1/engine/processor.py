@@ -67,9 +67,12 @@ class Processor:
                 f"which is greater than max allowed: {max_logprobs}")
 
         # Validate prompt logprobs.
-        if params.prompt_logprobs and params.prompt_logprobs > max_logprobs:
+        n_prompt_logprobs = (
+            (params.prompt_logprobs or 0) +
+            (len(params.watchlist_prompt_logprobs_token_ids or [])))
+        if n_prompt_logprobs > max_logprobs:
             raise ValueError(
-                f"Requested prompt logprobs of {params.prompt_logprobs}, "
+                f"Requested {n_prompt_logprobs} prompt logprobs, "
                 f"which is greater than max allowed: {max_logprobs}")
 
     def _validate_sampling_params(

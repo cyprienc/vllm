@@ -39,6 +39,13 @@ class LogprobsProcessor:
     ) -> "LogprobsProcessor":
         num_logprobs = request.sampling_params.logprobs
         num_prompt_logprobs = request.sampling_params.prompt_logprobs
+        if (num_prompt_logprobs is not None and
+                request.sampling_params.watchlist_prompt_logprobs_token_ids):
+            # If watchlist prompt logprobs are enabled, we need to
+            # add the number of tokens in the watchlist to the
+            # number of prompt logprobs requested.
+            num_prompt_logprobs += len(
+                request.sampling_params.watchlist_prompt_logprobs_token_ids)
         return cls(
             tokenizer=tokenizer,
             cumulative_logprob=(None if num_logprobs is None else 0.),
